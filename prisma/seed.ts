@@ -7,9 +7,9 @@ const prisma = new PrismaClient();
 async function main() {
   for (const s of DEFAULT_SUBJECTS) {
     await prisma.subject.upsert({
-      where: { name_level: { name: s.name, level: s.level } },
+      where: { name_level: { name: s.name, level: s.level as any } },
       update: {},
-      create: { name: s.name, level: s.level },
+      create: { name: s.name, level: s.level as any },
     });
   }
   console.log(`تم إضافة ${DEFAULT_SUBJECTS.length} مادة.`);
