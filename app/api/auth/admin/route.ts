@@ -17,21 +17,29 @@ export async function POST(req: NextRequest) {
   }
   const { username, password } = parsed.data;
 
-  const admin = await prisma.admin.findUnique({ where: { username } });
-  if (!admin) {
-    return NextResponse.json(
-      { error: "اسم المستخدم أو كلمة السر غلط" },
-      { status: 401 }
-    );
-  }
-  const valid = await bcrypt.compare(password, admin.passwordHash);
-  if (!valid) {
-    return NextResponse.json(
-      { error: "اسم المستخدم أو كلمة السر غلط" },
-      { status: 401 }
-    );
-  }
+  try {
+    const admin = await prisma.admin.findUnique({ where: { username } });
+    if (!admin) {
+      return NextResponse.json(
+        { error: "اسم المستخدم أو كلمة السر غلط (أو لم يتم تهيئة قاعدة البيانات بعد)" },
+        { status: 401 }
+      );
+    }
+    const valid = await bcrypt.compare(password, admin.passwordHash);
+    if (!valid) {
+      return NextResponse.json(
+        { error: "اسم المستخدم أو كلمة السر غلط" },
+        { status: 401 }
+      );
+    }
 
-  await createSession({ role: "ADMIN", id: admin.id, name: admin.username });
-  return NextResponse.json({ ok: true });
+    await createSession({ role: "ADMIN", id: admin.id, name: admin.username });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error("Admin Login DB Error:", err);
+    return NextResponse.json(
+      { error: "خطأ في الاتصال بقاعدة البيانات. الرجاء التأكد من إضافة متغير البيئة DATABASE_URL وإعداد قاعدة البيانات." },
+      { status: 500 }
+    );
+  }
 }
