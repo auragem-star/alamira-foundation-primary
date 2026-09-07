@@ -1,0 +1,121 @@
+// منصة الأميرة التعليمية - التأسيس والابتدائي
+// Prisma schema - PostgreSQL (متوافق مع Vercel Postgres)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum Level {
+  FOUNDATION // تأسيس
+  GRADE_1 // أولى ابتدائي
+  GRADE_2 // تانية ابتدائي
+  GRADE_3 // تالتة ابتدائي
+  GRADE_4 // رابعة ابتدائي
+  GRADE_5 // خامسة ابتدائي
+  GRADE_6 // سادسة ابتدائي
+}
+
+enum SubmissionType {
+  TEXT
+  IMAGE
+}
+
+enum CodeKind {
+  STUDENT
+  TEACHER
+}
+
+// ---------- Core models ----------
+
+// أكواد الطلاب. الطالب وولي الأمر يستخدمان نفس الكود (دخول ولي الأمر للمتابعة فقط)
+model StudentCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  studentName String? // بيتحدد أول ما الطالب يسجل، أو المدير بيحطه وقت التوزيع
+  level       Level? // بيتحدد أول ما الطالب يسجل من قايمة الصفوف
+  active      Boolean   @default(true)
+  batch       CodeBatch? @relation(fields: [batchId], references: [id])
+  batchId     String?
+  registeredAt DateTime?
+  createdAt   DateTime  @default(now())
+  submissions Submission[]
+
+  @@index([studentName])
+}
+
+// أكواد المعلمين (خاصة بهذه المنصة فقط - تأسيس وابتدائي)
+model TeacherCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  teacherName String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  homework    Homework[]
+}
+
+// دفعات الأكواد اللي المدير بيولّدها
+model CodeBatch {
+  id        String   @id @default(cuid())
+  kind      CodeKind
+  level     Level?
+  count     Int
+  createdAt DateTime @default(now())
+  codes     StudentCode[]
+}
+
+model Admin {
+  id           String @id @default(cuid())
+  username     String @unique
+  passwordHash String
+}
+
+model Subject {
+  id       String     @id @default(cuid())
+  name     String
+  level    Level? // null = متاحة لكل المستويات (زي الحاسب الآلي مثلا)
+  homework Homework[]
+
+  @@unique([name, level])
+}
+
+model Homework {
+  id            String      @id @default(cuid())
+  title         String
+  description   String?
+  fileUrl       String? // صورة أو PDF الواجب الأصلي (يفضل محفوظ دايمًا)
+  maxScore      Int         @default(20) // الدرجة النهائية
+  level         Level
+  subject       Subject     @relation(fields: [subjectId], references: [id])
+  subjectId     String
+  teacher       TeacherCode @relation(fields: [teacherId], references: [id])
+  teacherId     String
+  createdAt     DateTime    @default(now())
+  submissions   Submission[]
+}
+
+model Submission {
+  id             String         @id @default(cuid())
+  homework       Homework       @relation(fields: [homeworkId], references: [id])
+  homeworkId     String
+  student        StudentCode    @relation(fields: [studentCodeId], references: [id])
+  studentCodeId  String
+  type           SubmissionType
+  textContent    String? // لو النوع نصي
+  fileUrl        String? // لو النوع صورة
+  submittedAt    DateTime       @default(now())
+  score          Int?
+  gradeLabel     String? // التقدير
+  gradedAt       DateTime?
+  fileDeleteAt   DateTime? // موعد الحذف التلقائي المجدول بعد التصحيح
+  deleted        Boolean        @default(false)
+
+  @@unique([homeworkId, studentCodeId])
+  @@index([fileDeleteAt])
+}
